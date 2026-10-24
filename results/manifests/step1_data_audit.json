@@ -1,0 +1,280 @@
+{
+  "dataset_name": "Handbook_MultiEntity_Stream_v1",
+  "n_rows": 12000,
+  "n_frauds": 208,
+  "n_legitimate": 11792,
+  "missing_targets": 0,
+  "fraud_prevalence": 0.01733,
+  "identity_coverage_overall": 0.2649,
+  "time_audit": {
+    "min_TransactionDT": 87017.0,
+    "max_TransactionDT": 15638057.0,
+    "span_raw_units": 15551040.0,
+    "span_86400_day_units": 179.99,
+    "is_monotonic_non_decreasing": true,
+    "unique_timestamps": 11995
+  },
+  "temporal_bins": [
+    {
+      "bin_id": 0,
+      "dt_start": 87017.0,
+      "dt_end": 950963.7222222222,
+      "n_transactions": 666,
+      "n_frauds": 3,
+      "fraud_rate": 0.0045,
+      "identity_coverage": 0.2387,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 1,
+      "dt_start": 950963.7222222222,
+      "dt_end": 1814910.4444444445,
+      "n_transactions": 631,
+      "n_frauds": 15,
+      "fraud_rate": 0.02377,
+      "identity_coverage": 0.2425,
+      "low_positive_warning": false
+    },
+    {
+      "bin_id": 2,
+      "dt_start": 1814910.4444444445,
+      "dt_end": 2678857.166666667,
+      "n_transactions": 686,
+      "n_frauds": 22,
+      "fraud_rate": 0.03207,
+      "identity_coverage": 0.2843,
+      "low_positive_warning": false
+    },
+    {
+      "bin_id": 3,
+      "dt_start": 2678857.166666667,
+      "dt_end": 3542803.888888889,
+      "n_transactions": 657,
+      "n_frauds": 11,
+      "fraud_rate": 0.01674,
+      "identity_coverage": 0.2481,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 4,
+      "dt_start": 3542803.888888889,
+      "dt_end": 4406750.611111111,
+      "n_transactions": 652,
+      "n_frauds": 29,
+      "fraud_rate": 0.04448,
+      "identity_coverage": 0.2745,
+      "low_positive_warning": false
+    },
+    {
+      "bin_id": 5,
+      "dt_start": 4406750.611111111,
+      "dt_end": 5270697.333333334,
+      "n_transactions": 661,
+      "n_frauds": 8,
+      "fraud_rate": 0.0121,
+      "identity_coverage": 0.2526,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 6,
+      "dt_start": 5270697.333333334,
+      "dt_end": 6134644.055555556,
+      "n_transactions": 672,
+      "n_frauds": 9,
+      "fraud_rate": 0.01339,
+      "identity_coverage": 0.3065,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 7,
+      "dt_start": 6134644.055555556,
+      "dt_end": 6998590.777777778,
+      "n_transactions": 671,
+      "n_frauds": 15,
+      "fraud_rate": 0.02235,
+      "identity_coverage": 0.2668,
+      "low_positive_warning": false
+    },
+    {
+      "bin_id": 8,
+      "dt_start": 6998590.777777778,
+      "dt_end": 7862537.5,
+      "n_transactions": 651,
+      "n_frauds": 16,
+      "fraud_rate": 0.02458,
+      "identity_coverage": 0.2673,
+      "low_positive_warning": false
+    },
+    {
+      "bin_id": 9,
+      "dt_start": 7862537.5,
+      "dt_end": 8726484.222222222,
+      "n_transactions": 695,
+      "n_frauds": 7,
+      "fraud_rate": 0.01007,
+      "identity_coverage": 0.2432,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 10,
+      "dt_start": 8726484.222222222,
+      "dt_end": 9590430.944444444,
+      "n_transactions": 676,
+      "n_frauds": 7,
+      "fraud_rate": 0.01036,
+      "identity_coverage": 0.2574,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 11,
+      "dt_start": 9590430.944444444,
+      "dt_end": 10454377.666666668,
+      "n_transactions": 676,
+      "n_frauds": 7,
+      "fraud_rate": 0.01036,
+      "identity_coverage": 0.2633,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 12,
+      "dt_start": 10454377.666666668,
+      "dt_end": 11318324.38888889,
+      "n_transactions": 666,
+      "n_frauds": 13,
+      "fraud_rate": 0.01952,
+      "identity_coverage": 0.2898,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 13,
+      "dt_start": 11318324.38888889,
+      "dt_end": 12182271.111111112,
+      "n_transactions": 684,
+      "n_frauds": 14,
+      "fraud_rate": 0.02047,
+      "identity_coverage": 0.2588,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 14,
+      "dt_start": 12182271.111111112,
+      "dt_end": 13046217.833333334,
+      "n_transactions": 673,
+      "n_frauds": 10,
+      "fraud_rate": 0.01486,
+      "identity_coverage": 0.26,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 15,
+      "dt_start": 13046217.833333334,
+      "dt_end": 13910164.555555556,
+      "n_transactions": 644,
+      "n_frauds": 5,
+      "fraud_rate": 0.00776,
+      "identity_coverage": 0.2484,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 16,
+      "dt_start": 13910164.555555556,
+      "dt_end": 14774111.277777778,
+      "n_transactions": 646,
+      "n_frauds": 5,
+      "fraud_rate": 0.00774,
+      "identity_coverage": 0.2554,
+      "low_positive_warning": true
+    },
+    {
+      "bin_id": 17,
+      "dt_start": 14774111.277777778,
+      "dt_end": 15638058.0,
+      "n_transactions": 693,
+      "n_frauds": 12,
+      "fraud_rate": 0.01732,
+      "identity_coverage": 0.3074,
+      "low_positive_warning": true
+    }
+  ],
+  "entity_degree_audit": {
+    "card1": {
+      "unique_entities": 723,
+      "missing_or_unlinked_rate": 0.0,
+      "degree_p50": 14.0,
+      "degree_p90": 34.0,
+      "degree_p99": 59.0,
+      "max_degree": 88,
+      "top_1pct_entity_tx_share": 0.0453,
+      "tx_share_in_hubs_deg_gt_50": 0.1082
+    },
+    "card_comp": {
+      "unique_entities": 1166,
+      "missing_or_unlinked_rate": 0.0,
+      "degree_p50": 9.0,
+      "degree_p90": 20.0,
+      "degree_p99": 37.0,
+      "max_degree": 48,
+      "top_1pct_entity_tx_share": 0.0423,
+      "tx_share_in_hubs_deg_gt_50": 0.0
+    },
+    "terminal_id": {
+      "unique_entities": 450,
+      "missing_or_unlinked_rate": 0.0,
+      "degree_p50": 26.0,
+      "degree_p90": 39.0,
+      "degree_p99": 52.01999999999998,
+      "max_degree": 62,
+      "top_1pct_entity_tx_share": 0.0235,
+      "tx_share_in_hubs_deg_gt_50": 0.032
+    },
+    "addr1": {
+      "unique_entities": 245,
+      "missing_or_unlinked_rate": 0.0,
+      "degree_p50": 14.0,
+      "degree_p90": 82.19999999999999,
+      "degree_p99": 688.9200000000008,
+      "max_degree": 2536,
+      "top_1pct_entity_tx_share": 0.3683,
+      "tx_share_in_hubs_deg_gt_50": 0.7538
+    },
+    "P_emaildomain": {
+      "unique_entities": 54,
+      "missing_or_unlinked_rate": 0.0,
+      "degree_p50": 32.5,
+      "degree_p90": 337.20000000000044,
+      "degree_p99": 3548.8099999999954,
+      "max_degree": 5734,
+      "top_1pct_entity_tx_share": 0.4778,
+      "tx_share_in_hubs_deg_gt_50": 0.9263
+    },
+    "DeviceInfo": {
+      "unique_entities": 779,
+      "missing_or_unlinked_rate": 0.7351,
+      "degree_p50": 3.0,
+      "degree_p90": 8.0,
+      "degree_p99": 16.220000000000027,
+      "max_degree": 23,
+      "top_1pct_entity_tx_share": 0.0469,
+      "tx_share_in_hubs_deg_gt_50": 0.0
+    }
+  },
+  "integrity_assertions_passed": true,
+  "simulator_metadata": {
+    "n_transactions": 12000,
+    "n_days": 180,
+    "fraud_count": 208,
+    "fraud_prevalence": 0.017333333333333333,
+    "identity_coverage": 0.2649166666666667,
+    "unique_card1": 723,
+    "unique_card_comp": 1166,
+    "unique_addr1": 245,
+    "unique_email": 54,
+    "unique_device": 779,
+    "scenario_counts": {
+      "legitimate": 11792,
+      "S1_amount_anomaly": 44,
+      "S2_compromised_terminal": 45,
+      "S3_coordinated_ring_card": 119
+    }
+  }
+}
