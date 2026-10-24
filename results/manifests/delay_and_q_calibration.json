@@ -51,24 +51,27 @@
       "age_bin": "[0, 1)d",
       "a_mid": 0.5,
       "n_unreported": 74,
-      "mean_predicted_q": 0.01381,
+      "estimated_pi_tau": 0.01874,
+      "mean_predicted_q": 0.01371,
       "empirical_hidden_fraud_rate": 0.05405,
-      "abs_calibration_gap": 0.04025
+      "abs_calibration_gap": 0.04035
     },
     {
       "scenario": "D1",
       "age_bin": "[1, 3)d",
       "a_mid": 2.0,
       "n_unreported": 140,
-      "mean_predicted_q": 0.00523,
+      "estimated_pi_tau": 0.01874,
+      "mean_predicted_q": 0.00519,
       "empirical_hidden_fraud_rate": 0.00714,
-      "abs_calibration_gap": 0.00191
+      "abs_calibration_gap": 0.00195
     },
     {
       "scenario": "D1",
       "age_bin": "[3, 7)d",
       "a_mid": 5.0,
       "n_unreported": 274,
+      "estimated_pi_tau": 0.01874,
       "mean_predicted_q": 0.00074,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.00074
@@ -78,6 +81,7 @@
       "age_bin": "[7, 14)d",
       "a_mid": 10.5,
       "n_unreported": 446,
+      "estimated_pi_tau": 0.01874,
       "mean_predicted_q": 3e-05,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 3e-05
@@ -87,6 +91,7 @@
       "age_bin": "[14, 30)d",
       "a_mid": 22.0,
       "n_unreported": 1074,
+      "estimated_pi_tau": 0.01874,
       "mean_predicted_q": 0.0,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.0
@@ -96,6 +101,7 @@
       "age_bin": "[30, 60)d",
       "a_mid": 45.0,
       "n_unreported": 1968,
+      "estimated_pi_tau": 0.01874,
       "mean_predicted_q": 0.0,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.0
@@ -105,6 +111,7 @@
       "age_bin": "[60, 95)d",
       "a_mid": 77.5,
       "n_unreported": 2283,
+      "estimated_pi_tau": 0.01874,
       "mean_predicted_q": 0.0,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.0
@@ -114,51 +121,57 @@
       "age_bin": "[0, 1)d",
       "a_mid": 0.5,
       "n_unreported": 74,
-      "mean_predicted_q": 0.01619,
+      "estimated_pi_tau": 0.0191,
+      "mean_predicted_q": 0.01638,
       "empirical_hidden_fraud_rate": 0.05405,
-      "abs_calibration_gap": 0.03786
+      "abs_calibration_gap": 0.03767
     },
     {
       "scenario": "D2",
       "age_bin": "[1, 3)d",
       "a_mid": 2.0,
       "n_unreported": 141,
-      "mean_predicted_q": 0.01235,
+      "estimated_pi_tau": 0.0191,
+      "mean_predicted_q": 0.0125,
       "empirical_hidden_fraud_rate": 0.01418,
-      "abs_calibration_gap": 0.00183
+      "abs_calibration_gap": 0.00169
     },
     {
       "scenario": "D2",
       "age_bin": "[3, 7)d",
       "a_mid": 5.0,
       "n_unreported": 275,
-      "mean_predicted_q": 0.00938,
+      "estimated_pi_tau": 0.0191,
+      "mean_predicted_q": 0.00949,
       "empirical_hidden_fraud_rate": 0.00364,
-      "abs_calibration_gap": 0.00574
+      "abs_calibration_gap": 0.00586
     },
     {
       "scenario": "D2",
       "age_bin": "[7, 14)d",
       "a_mid": 10.5,
       "n_unreported": 448,
-      "mean_predicted_q": 0.00434,
+      "estimated_pi_tau": 0.0191,
+      "mean_predicted_q": 0.00439,
       "empirical_hidden_fraud_rate": 0.00446,
-      "abs_calibration_gap": 0.00013
+      "abs_calibration_gap": 7e-05
     },
     {
       "scenario": "D2",
       "age_bin": "[14, 30)d",
       "a_mid": 22.0,
       "n_unreported": 1075,
-      "mean_predicted_q": 0.00152,
+      "estimated_pi_tau": 0.0191,
+      "mean_predicted_q": 0.00154,
       "empirical_hidden_fraud_rate": 0.00093,
-      "abs_calibration_gap": 0.00059
+      "abs_calibration_gap": 0.00061
     },
     {
       "scenario": "D2",
       "age_bin": "[30, 60)d",
       "a_mid": 45.0,
       "n_unreported": 1968,
+      "estimated_pi_tau": 0.0191,
       "mean_predicted_q": 0.0,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.0
@@ -168,6 +181,7 @@
       "age_bin": "[60, 95)d",
       "a_mid": 77.5,
       "n_unreported": 2283,
+      "estimated_pi_tau": 0.0191,
       "mean_predicted_q": 0.0,
       "empirical_hidden_fraud_rate": 0.0,
       "abs_calibration_gap": 0.0
@@ -177,63 +191,70 @@
       "age_bin": "[0, 1)d",
       "a_mid": 0.5,
       "n_unreported": 74,
-      "mean_predicted_q": 0.01673,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.02049,
       "empirical_hidden_fraud_rate": 0.05405,
-      "abs_calibration_gap": 0.03733
+      "abs_calibration_gap": 0.03356
     },
     {
       "scenario": "D3",
       "age_bin": "[1, 3)d",
       "a_mid": 2.0,
       "n_unreported": 141,
-      "mean_predicted_q": 0.01366,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.01675,
       "empirical_hidden_fraud_rate": 0.01418,
-      "abs_calibration_gap": 0.00052
+      "abs_calibration_gap": 0.00257
     },
     {
       "scenario": "D3",
       "age_bin": "[3, 7)d",
       "a_mid": 5.0,
       "n_unreported": 275,
-      "mean_predicted_q": 0.01129,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.01385,
       "empirical_hidden_fraud_rate": 0.00364,
-      "abs_calibration_gap": 0.00766
+      "abs_calibration_gap": 0.01022
     },
     {
       "scenario": "D3",
       "age_bin": "[7, 14)d",
       "a_mid": 10.5,
       "n_unreported": 452,
-      "mean_predicted_q": 0.00729,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.00895,
       "empirical_hidden_fraud_rate": 0.01327,
-      "abs_calibration_gap": 0.00599
+      "abs_calibration_gap": 0.00433
     },
     {
       "scenario": "D3",
       "age_bin": "[14, 30)d",
       "a_mid": 22.0,
       "n_unreported": 1076,
-      "mean_predicted_q": 0.00504,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.00619,
       "empirical_hidden_fraud_rate": 0.00186,
-      "abs_calibration_gap": 0.00318
+      "abs_calibration_gap": 0.00433
     },
     {
       "scenario": "D3",
       "age_bin": "[30, 60)d",
       "a_mid": 45.0,
       "n_unreported": 1974,
-      "mean_predicted_q": 0.00288,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.00354,
       "empirical_hidden_fraud_rate": 0.00304,
-      "abs_calibration_gap": 0.00016
+      "abs_calibration_gap": 0.0005
     },
     {
       "scenario": "D3",
       "age_bin": "[60, 95)d",
       "a_mid": 77.5,
       "n_unreported": 2285,
-      "mean_predicted_q": 0.00084,
+      "estimated_pi_tau": 0.02311,
+      "mean_predicted_q": 0.00103,
       "empirical_hidden_fraud_rate": 0.00088,
-      "abs_calibration_gap": 4e-05
+      "abs_calibration_gap": 0.00015
     }
   ]
 }

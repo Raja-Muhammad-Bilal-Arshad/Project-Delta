@@ -1,8 +1,9 @@
-"""Label-Delay Models and Bayesian Maturity-Aware Posterior Computation (Section 9).
+"""Label-Delay Models and Bayesian Maturity-Aware Posterior Computation (Section 9 & Audit Issues 5-6).
 
 Implements exact bounded/truncated delay distributions (D0, D1, D2, D3),
-event-log label visibility state reconstruction at cutoff tau, time-safe
-fraud prior estimation, and Bayesian posterior soft targets q(a).
+event-log label visibility state reconstruction at cutoff tau with explicit
+confirmed-mature-negative masks, time-safe cutoff-specific fraud prior estimation,
+and Bayesian posterior soft targets q(a; pi_tau).
 """
 from __future__ import annotations
 import numpy as np
@@ -35,7 +36,6 @@ def solve_truncated_exponential_lambda(median_days: float = 1.0, max_days: float
 LAMBDA_D1_14D = solve_truncated_exponential_lambda(1.0, 14.0)
 
 # Piecewise-linear knot points for D2 (inspired by Nguyen et al., AISTATS 2022 compromised-card profile)
-# Knots in days: (0.0, 0.0), (1/24 day, 0.01), (1.0 day, 0.30), (7.0 days, 0.60), (10.0 days, 0.80), (30.0 days, 1.00)
 D2_KNOTS_DAYS = np.array([0.0, 1.0 / 24.0, 1.0, 7.0, 10.0, 30.0], dtype=np.float64)
 D2_KNOTS_CDF = np.array([0.0, 0.01, 0.30, 0.60, 0.80, 1.00], dtype=np.float64)
 
@@ -105,10 +105,7 @@ def generate_event_log_delays(
     card_ids: Optional[np.ndarray] = None,
     card_correlated: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Generates simulated report arrival times t_i^rep = t_i + D_i for Y_i=1, and +inf for Y_i=0.
-    If card_correlated=True, compromised cards share a card-blocking timestamp t_block = min(t_i + D_i)
-    across fraud events on that card proxy.
-    """
+    """Generates simulated report arrival times t_i^rep = t_i + D_i for Y_i=1, and +inf for Y_i=0."""
     n = len(event_times_days)
     delays = np.full(n, np.inf, dtype=np.float64)
     report_times = np.full(n, np.inf, dtype=np.float64)
@@ -119,8 +116,6 @@ def generate_event_log_delays(
         delays[fraud_mask] = drawn_delays
         report_times[fraud_mask] = event_times_days[fraud_mask] + drawn_delays
         if card_correlated and card_ids is not None:
-            # Compromised card blocking correlation: once the earliest fraud report on a card arrives,
-            # all prior fraudulent transactions on that card become reported at max(t_i, min_report_time).
             fraud_indices = np.where(fraud_mask)[0]
             card_min_rep: Dict[int, float] = {}
             for idx in fraud_indices:
@@ -137,15 +132,16 @@ def generate_event_log_delays(
 
 def compute_posterior_q(
     age_days: np.ndarray | float,
-    prior_pi: float,
+    prior_pi: np.ndarray | float,
     survival_scenario_id: str,
     maturity_horizon_days: Optional[float] = None,
 ) -> np.ndarray:
-    """Computes Bayesian posterior q(a) = [pi * S(a)] / [pi * S(a) + (1 - pi)]
-    for an unreported transaction of age a >= 0 (Section 9.2).
+    """Computes Bayesian posterior q(a; pi) = [pi * S(a)] / [pi * S(a) + (1 - pi)]
+    for unreported transaction(s) of age a >= 0 (Section 9.2).
+    Supports both scalar `prior_pi` and elementwise array `prior_pi`.
     """
     a = np.asarray(age_days, dtype=np.float64)
-    pi = float(np.clip(prior_pi, 1e-6, 1.0 - 1e-6))
+    pi = np.clip(np.asarray(prior_pi, dtype=np.float64), 1e-6, 1.0 - 1e-6)
     s_a = delay_survival(a, survival_scenario_id)
     if maturity_horizon_days is not None:
         s_a = np.where(a >= maturity_horizon_days, 0.0, s_a)
@@ -161,29 +157,82 @@ def estimate_time_safe_prior(
     cutoff_tau: float,
     maturity_horizon_days: float,
     survival_scenario_id: str,
-    default_prior: float = 0.035,
+    default_prior: float = 0.0175,
+    prior_mode: str = "historical_smoothed",
+    true_labels_for_oracle_only: Optional[np.ndarray] = None,
 ) -> float:
-    """Estimates fraud prevalence pi_tau at cutoff tau without peeking at future or hidden labels.
-    Uses mature historical cohort (a_i >= M) if non-empty; otherwise applies IPW/Horvitz-Thompson
-    survival adjustment on visible reports with Laplace smoothing.
+    """Estimates fraud prevalence pi_tau at cutoff tau strictly from historical events <= cutoff_tau
+    and reports <= cutoff_tau (Audit Issue 5).
+    Applies `prior_mode` scaling consistently (`historical_smoothed` = 1.0x, `underestimated_0.5x` = 0.5x,
+    `overestimated_2.0x` = 2.0x, `oracle_true_rate` = oracle historical rate on t <= cutoff_tau).
     """
     hist_mask = (event_times_days <= cutoff_tau)
     if not np.any(hist_mask):
-        return default_prior
-    ages = cutoff_tau - event_times_days[hist_mask]
-    vis_pos = (report_times_days[hist_mask] <= cutoff_tau)
-    mature_mask = (ages >= maturity_horizon_days)
-    if np.sum(mature_mask) >= 200:
-        mature_rate = float(np.mean(vis_pos[mature_mask]))
-        # Smooth slightly with recent IPW estimate to handle mild drift
-        cdf_vals = np.maximum(delay_cdf(ages, survival_scenario_id), 0.05)
-        ipw_rate = float(np.sum(vis_pos / cdf_vals) / len(ages))
-        est = 0.75 * mature_rate + 0.25 * ipw_rate
-        return float(np.clip(est, 0.002, 0.50))
+        base_est = default_prior
+    elif prior_mode == "oracle_true_rate" and true_labels_for_oracle_only is not None:
+        base_est = float(np.mean(true_labels_for_oracle_only[hist_mask]))
     else:
-        cdf_vals = np.maximum(delay_cdf(ages, survival_scenario_id), 0.10)
-        ipw_rate = float((np.sum(vis_pos / cdf_vals) + 2.0 * default_prior) / (len(ages) + 2.0))
-        return float(np.clip(ipw_rate, 0.002, 0.50))
+        ages = cutoff_tau - event_times_days[hist_mask]
+        vis_pos = (report_times_days[hist_mask] <= cutoff_tau)
+        mature_mask = (ages >= maturity_horizon_days)
+        if np.sum(mature_mask) >= 200:
+            mature_rate = float(np.mean(vis_pos[mature_mask]))
+            cdf_vals = np.maximum(delay_cdf(ages, survival_scenario_id), 0.05)
+            ipw_rate = float(np.sum(vis_pos / cdf_vals) / len(ages))
+            base_est = 0.75 * mature_rate + 0.25 * ipw_rate
+        else:
+            cdf_vals = np.maximum(delay_cdf(ages, survival_scenario_id), 0.10)
+            m0 = 50.0
+            base_est = float((np.sum(vis_pos / cdf_vals) + m0 * default_prior) / (len(ages) + m0))
+
+    base_clipped = float(np.clip(base_est, 0.002, 0.24))
+    if prior_mode == "underestimated_0.5x":
+        scaled_est = 0.5 * base_clipped
+    elif prior_mode == "overestimated_2.0x":
+        scaled_est = 2.0 * base_clipped
+    else:
+        scaled_est = base_clipped
+    return float(np.clip(scaled_est, 0.0005, 0.50))
+
+
+def compute_time_safe_prior_trajectory(
+    event_times_days: np.ndarray,
+    report_times_days: np.ndarray,
+    maturity_horizon_days: float,
+    survival_scenario_id: str,
+    prior_mode: str = "historical_smoothed",
+    default_prior: float = 0.0175,
+    true_labels_for_oracle_only: Optional[np.ndarray] = None,
+    eval_grid_step_days: float = 1.0,
+) -> np.ndarray:
+    """Computes a time-safe cutoff-specific prior vector `prior_pi_vec[i]` for every transaction i
+    at its own timestamp `tau_i = event_times_days[i]` using ONLY historical observations <= tau_i.
+    Uses a fine chronological grid (default 1.0 day, exact on grid boundaries) for fast O(N) evaluation
+    while guaranteeing zero future-label leakage.
+    """
+    n = len(event_times_days)
+    if n == 0:
+        return np.array([], dtype=np.float64)
+
+    # Evaluate exact time-safe prior at each unique integer/grid day and interpolate causally (left-step)
+    t_min = float(np.min(event_times_days))
+    t_max = float(np.max(event_times_days))
+    grid_taus = np.arange(np.floor(t_min), np.ceil(t_max) + eval_grid_step_days, eval_grid_step_days, dtype=np.float64)
+    grid_priors = np.empty(len(grid_taus), dtype=np.float64)
+    for g_idx, g_tau in enumerate(grid_taus):
+        grid_priors[g_idx] = estimate_time_safe_prior(
+            event_times_days=event_times_days,
+            report_times_days=report_times_days,
+            cutoff_tau=float(g_tau),
+            maturity_horizon_days=maturity_horizon_days,
+            survival_scenario_id=survival_scenario_id,
+            default_prior=default_prior,
+            prior_mode=prior_mode,
+            true_labels_for_oracle_only=true_labels_for_oracle_only,
+        )
+    # Causal step lookup: use largest grid_tau <= event_times_days[i]
+    idx = np.clip(np.searchsorted(grid_taus, event_times_days, side="right") - 1, 0, len(grid_taus) - 1)
+    return grid_priors[idx]
 
 
 def reconstruct_label_state_at_cutoff(
@@ -195,13 +244,13 @@ def reconstruct_label_state_at_cutoff(
     prior_pi: float,
     true_labels_for_oracle_only: Optional[np.ndarray] = None,
 ) -> Dict[str, np.ndarray]:
-    """Reconstructs observable label state at decision/retraining cutoff tau (Section 9.4).
+    """Reconstructs observable label state at decision/retraining cutoff tau (Section 9.4 & Audit Issue 6).
     Crucially, model-facing states (V0, V1, V2) NEVER inspect true_labels_for_oracle_only;
     they rely exclusively on event_times_days and report_times_days <= cutoff_tau.
-    
+
     State codes:
       1 = Visible positive (report_time <= cutoff_tau and event_time <= cutoff_tau)
-      0 = Mature negative (report_time > cutoff_tau and age >= maturity_horizon_days)
+      0 = Confirmed mature negative (report_time > cutoff_tau and age >= maturity_horizon_days)
       2 = Immature / unreported (report_time > cutoff_tau and 0 <= age < maturity_horizon_days)
      -1 = Future transaction (event_time > cutoff_tau; excluded from state)
     """
@@ -211,6 +260,7 @@ def reconstruct_label_state_at_cutoff(
     is_unreported = is_past & (~is_vis_pos)
     is_mature_neg = is_unreported & (ages >= maturity_horizon_days)
     is_immature = is_unreported & (ages < maturity_horizon_days)
+    known_label_mask = is_vis_pos | is_mature_neg
 
     state_code = np.full(len(event_times_days), -1, dtype=np.int8)
     state_code[is_vis_pos] = 1
@@ -218,13 +268,13 @@ def reconstruct_label_state_at_cutoff(
     state_code[is_immature] = 2
 
     q_imm = compute_posterior_q(ages, prior_pi, survival_scenario_id, maturity_horizon_days)
-    
+
     # Targets for V0, V1, V2
     y_v0 = np.where(is_vis_pos, 1.0, 0.0)
     mask_v0 = is_past
 
     y_v1 = np.where(is_vis_pos, 1.0, 0.0)
-    mask_v1 = is_vis_pos | is_mature_neg  # Drops immature rows from training loss
+    mask_v1 = known_label_mask  # Drops immature rows from training loss
 
     y_v2 = np.where(is_vis_pos, 1.0, np.where(is_mature_neg, 0.0, q_imm))
     mask_v2 = is_past
@@ -235,7 +285,9 @@ def reconstruct_label_state_at_cutoff(
         "is_past": is_past,
         "is_vis_pos": is_vis_pos,
         "is_mature_neg": is_mature_neg,
+        "confirmed_neg_mask": is_mature_neg,
         "is_immature": is_immature,
+        "known_label_mask": known_label_mask,
         "q_posterior": np.where(is_immature, q_imm, np.where(is_vis_pos, 1.0, 0.0)),
         "y_v0": y_v0,
         "mask_v0": mask_v0,

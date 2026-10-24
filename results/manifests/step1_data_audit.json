@@ -1,5 +1,5 @@
 {
-  "dataset_name": "Handbook_MultiEntity_Stream_v1",
+  "dataset_name": "Handbook_MultiEntity_Stream_v2_12k",
   "n_rows": 12000,
   "n_frauds": 208,
   "n_legitimate": 11792,
@@ -260,8 +260,15 @@
   },
   "integrity_assertions_passed": true,
   "simulator_metadata": {
+    "generator_version": "handbook_multi_entity_v2.0_reconciled_12k",
+    "seed": 20261024,
     "n_transactions": 12000,
     "n_days": 180,
+    "n_customers": 1200,
+    "n_terminals": 450,
+    "n_addresses": 450,
+    "n_email_domains": 60,
+    "n_devices": 1800,
     "fraud_count": 208,
     "fraud_prevalence": 0.017333333333333333,
     "identity_coverage": 0.2649166666666667,

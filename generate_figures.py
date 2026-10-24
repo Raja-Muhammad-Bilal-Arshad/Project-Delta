@@ -42,14 +42,19 @@ SLATE = "#5D6D7E"
 PURPLE = "#6C3483"
 LIGHT_BG = "#F8F9FA"
 
-with open("/tmp/project/results/manifests/frozen_results_bundle.json") as f:
+from pathlib import Path
+import argparse
+PROJECT_ROOT = Path(__file__).resolve().parent
+parser = argparse.ArgumentParser()
+parser.add_argument("--results-dir", type=str, default=os.environ.get("PROJECT_DELTA_OUTPUT_DIR", str(PROJECT_ROOT / "results")))
+args, _ = parser.parse_known_args()
+res_dir = Path(args.results_dir).resolve()
+b_v2 = res_dir / "manifests/frozen_results_bundle_v2.json"
+b_v1 = res_dir / "manifests/frozen_results_bundle.json"
+with open(b_v2 if b_v2.is_file() else b_v1) as f:
     bundle = json.load(f)
 
-fig_dirs = [
-    "/tmp/project/results/figures",
-    "/working_dir/c_86a5839ba5fb98b3/project/results/figures",
-    "/working_dir/c_86a5839ba5fb98b3/artifacts/file_generation/ttl=63d/intermediate",
-]
+fig_dirs = [str(res_dir / "figures")]
 for d in fig_dirs:
     os.makedirs(d, exist_ok=True)
 
@@ -172,8 +177,8 @@ save_all(fig, "fig2_data_audit_and_hubs.png")
 leak = bundle["leakage_matrix_runs"]
 models_l = [
     ("B1_causal_aggregates", "B1: Tree + Neighbor Agg."),
-    ("B3_graphsage", "B3: GraphSAGE"),
-    ("B4_domain_care_gnn", "B4: Domain GNN (CARE)"),
+    ("B3_graphsage", "B3: Causal Agg. MLP (SAGE-Style)"),
+    ("B4_domain_care_gnn", "B4: Sim-Gated MLP (CARE-Insp.)"),
     ("B5_proposed_maturity_hybrid", "B5: Proposed Hybrid"),
 ]
 protocols_l = [
@@ -227,7 +232,7 @@ blk_labels = [f"B{i}\n(d{101+10*(i-1)}-{101+10*i})" for i in blk_nums]
 series_cfg = [
     ("B0_raw_tabular__V2__P3__D2", "B0: Raw Tabular (V2)", SLATE, "s", "--"),
     ("B1_causal_aggregates__V2__P3__D2", "B1: Tree + Causal Neighbor Agg. (V2)", NAVY, "^", "-"),
-    ("B4_domain_care_gnn__V2__P3__D2", "B4: Domain GNN (CARE-GNN, V2)", PURPLE, "d", "-."),
+    ("B4_domain_care_gnn__V2__P3__D2", "B4: Sim-Gated MLP (CARE-Insp., V2)", PURPLE, "d", "-."),
     ("B5_proposed_maturity_hybrid__V2__P3__D2", "B5: Proposed Maturity Hybrid (V2)", TEAL, "o", "-"),
 ]
 
@@ -356,18 +361,18 @@ stratum_models = [
     ("B4_domain_care_gnn__V2__P3__D2", "B4: Domain\nGNN (CARE)"),
     ("B5_proposed_maturity_hybrid__V2__P3__D2", "B5: Proposed\nHybrid"),
 ]
-vis_nbr_aps = [prim[k]["stratum_h3"]["with_visible_prior_fraud_neighbor_2hop"]["AP"] for k, _ in stratum_models]
-iso_aps = [prim[k]["stratum_h3"]["isolated_no_visible_fraud_neighbor_2hop"]["AP"] for k, _ in stratum_models]
+vis_nbr_aps = [prim[k]["stratum_h3_specific_2hop"]["with_visible_prior_fraud_neighbor"]["AP"] for k, _ in stratum_models]
+iso_aps = [prim[k]["stratum_h3_specific_2hop"]["isolated_no_visible_fraud_neighbor"]["AP"] for k, _ in stratum_models]
 
 x_s = np.arange(len(stratum_models))
 w_s = 0.32
-ax2.bar(x_s - w_s/2, vis_nbr_aps, width=w_s, color=TEAL, label="Stratum 1: ≥1 Visible Prior Fraud Neighbor (2-Hop)")
-ax2.bar(x_s + w_s/2, iso_aps, width=w_s, color=SLATE, label="Stratum 2: Isolated (0 Visible Prior Fraud Neighbors)")
+ax2.bar(x_s - w_s/2, vis_nbr_aps, width=w_s, color=TEAL, label="Stratum 1: ≥1 Vis. Prior Fraud Nbr (2-Hop Specific, 49.3% frauds)")
+ax2.bar(x_s + w_s/2, iso_aps, width=w_s, color=SLATE, label="Stratum 2: Isolated on Specific Entities (50.7% frauds)")
 ax2.set_xticks(x_s)
 ax2.set_xticklabels([lbl for _, lbl in stratum_models], fontsize=8.5)
-ax2.set_ylim(0.35, 0.72)
+ax2.set_ylim(0.35, 0.74)
 ax2.set_ylabel("Pooled Test Average Precision (AP)", fontweight="bold")
-ax2.set_title("(b) H3: Lift by Fraud-Neighbor Stratum", fontsize=10.2)
+ax2.set_title("(b) H3: Lift by Specific-Entity 2-Hop Stratum", fontsize=10.2)
 ax2.legend(loc="upper left", fontsize=8, frameon=True, facecolor=LIGHT_BG)
 ax2.grid(axis="y", ls=":", alpha=0.5)
 
@@ -383,8 +388,8 @@ eff_models = [
     ("B0_raw_tabular__V2__P3__D2", "B0: Raw Tabular", SLATE, "s"),
     ("B1_causal_aggregates__V2__P3__D2", "B1: Tree + Causal Agg.", NAVY, "^"),
     ("B2_graph_light__V2__P3__D2", "B2: Graph-Light Tree", AMBER, "P"),
-    ("B3_graphsage__V2__P3__D2", "B3: Causal GraphSAGE", PURPLE, "D"),
-    ("B4_domain_care_gnn__V2__P3__D2", "B4: Domain GNN (CARE)", CRIMSON, "X"),
+    ("B3_graphsage__V2__P3__D2", "B3: Causal Agg. MLP", PURPLE, "D"),
+    ("B4_domain_care_gnn__V2__P3__D2", "B4: Sim-Gated MLP (CARE-Insp.)", CRIMSON, "X"),
     ("B5_proposed_maturity_hybrid__V2__P3__D2", "B5: Proposed Hybrid", TEAL, "o"),
 ]
 for k, lbl, col, mk in eff_models:
@@ -393,10 +398,10 @@ for k, lbl, col, mk in eff_models:
     ax1.scatter([rt], [ap], color=col, marker=mk, s=110, label=f"{lbl} ({rt:.1f}s)")
     ax1.annotate(lbl.split(":")[0], (rt, ap), xytext=(5, 4), textcoords="offset points", fontsize=8.5, fontweight="bold", color=col)
 
-ax1.set_xlabel("8-Block Rolling Training + Inference Wall Time (Seconds)", fontweight="bold")
+ax1.set_xlabel("8-Block Rolling Wall Time Across 5 Seeds (Seconds)", fontweight="bold")
 ax1.set_ylabel("Macro Average Precision (AP)", fontweight="bold")
 ax1.set_title("(a) Accuracy vs. Computational Runtime Pareto Frontier")
-ax1.set_xlim(0, 13.5)
+ax1.set_xlim(0, 31.0)
 ax1.set_ylim(0.50, 0.65)
 ax1.legend(loc="lower right", fontsize=8, frameon=True, facecolor=LIGHT_BG)
 ax1.grid(True, ls=":", alpha=0.5)

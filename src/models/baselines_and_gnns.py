@@ -1,18 +1,31 @@
-"""Baseline Tree Ensembles and Graph Neural Network Models (Sections 9.5 & 11).
+"""Custom Histogram Newton-Boosted Tree Ensembles and Causal Relational Neural Models (Sections 9.5 & 11, Audit Issues 3-4).
 
-Implements all six pre-registered model tiers (B0 to B5) with exact support for
-hard binary targets (V0, V1, V3) and continuous Bayesian posterior soft targets q(a) (V2):
-  - B0: Raw Tabular Histogram Gradient Boosted Decision Trees (GBDT)
-  - B1: Causal Aggregates + GBDT (tabular + per-relation causal velocity, counts, and label summaries)
-  - B2: Graph-Light Baseline (GBDT + 1-hop & 2-hop structural neighbor feature diffusion)
-  - B3: Generic Causal GNN (2-layer GraphSAGE with relation-specific projection & residual MLP trained via Adam)
-  - B4: Domain Fraud GNN (CARE-GNN / GTAN adaptation with similarity-filtered neighborhood aggregation & gated residual)
-  - B5: Proposed Maturity-Aware Variant (Preselected on validation windows under V2 soft-target loss & hub control).
+Scientific & Architectural Disclosure (Route B Reconciled Taxonomy):
+  Because the sandboxed execution environment provides pure NumPy/SciPy (`numpy 2.1.3`, `scipy 1.15.2`)
+  without external C++/CUDA libraries (`lightgbm`, `xgboost`, `torch`, `torch_geometric`), all six model
+  tiers (B0 to B5) are implemented as self-contained, unit-tested NumPy estimators and are named
+  strictly according to their actual mathematical computations:
+    - B0 (`B0_raw_tabular`): Custom Oblivious Histogram Newton-Boosted Decision Trees (`SoftTargetHistGBDT`)
+      on raw authorization-time tabular attributes (`X_base`).
+    - B1 (`B1_causal_aggregates`): `SoftTargetHistGBDT` on `X_base` + 7 per-relation causal velocity,
+      degree, visible-fraud, mature-negative, immature-count, and expected hidden-fraud mass features (`rel_feats`).
+    - B2 (`B2_graph_light`): `SoftTargetHistGBDT` on `X_base` + `rel_feats` + 1-hop and 2-hop causally
+      diffused neighbor feature aggregations (`msg_1hop`, `msg_2hop`).
+    - B3 (`B3_graphsage` / Custom Causal Aggregate MLP): Custom 2-Layer Causal Relational MLP
+      (`CausalGraphNeuralNetwork` with `domain_care_filter=False`) operating over `X_base`, `rel_feats`,
+      and 1-hop neighbor messages (`msg_1hop`) with residual skip connections, trained via Adam on expected
+      cross-entropy loss. (A custom GraphSAGE-inspired relational feature neural model, not standard PyG GraphSAGE.)
+    - B4 (`B4_domain_care_gnn` / Custom Similarity-Gated Relational NN): Custom Similarity-Gated Causal
+      Relational Neural Network (`CausalGraphNeuralNetwork` with `domain_care_filter=True`) incorporating
+      Euclidean distance-filtered neighbor messages (`sim_filtered_msg`) and a learned sigmoid feature gate
+      over relational inputs. (A CARE-GNN-inspired adaptation using precomputed distance weights + learned gating,
+      not Dou et al.'s full RL step-size neighbor selector.)
+    - B5 (`B5_proposed_maturity_hybrid`): Validation-Selected Hybrid Ensemble combining `SoftTargetHistGBDT`
+      and `CausalGraphNeuralNetwork` (`domain_care_filter=True`) over maturity-aware causal features.
 
 All models fit feature normalizers and quantile bins STRICTLY on the training partition.
 """
 from __future__ import annotations
-import time
 import numpy as np
 from typing import Dict, Any, Optional, Tuple
 
@@ -22,15 +35,16 @@ def _sigmoid(z: np.ndarray) -> np.ndarray:
 
 
 class SoftTargetHistGBDT:
-    """Fast Histogram Gradient Boosted Decision Tree Ensemble supporting continuous soft targets y in [0, 1].
-    Matches LightGBM / XGBoost second-order Newton boosting on log-loss:
-      g_i = p_i - y_i,   h_i = p_i * (1 - p_i)
-    Uses depth-3 oblivious/Cartesian interaction trees over quantile-binned features for fast vectorized fitting.
+    """Custom Oblivious Histogram Newton-Boosted Decision Tree Ensemble supporting continuous
+    soft targets y in [0, 1] via second-order Newton steps on expected binary cross-entropy:
+      g_i = p_i - y_i,   h_i = max(p_i * (1 - p_i), 1e-5)
+    Fits depth-3 oblivious (8-leaf Cartesian split) trees over quantile-binned features.
+    Note: This is a custom NumPy histogram boosting baseline, distinct from LightGBM/XGBoost.
     """
     def __init__(
         self,
-        n_estimators: int = 25,
-        learning_rate: float = 0.14,
+        n_estimators: int = 20,
+        learning_rate: float = 0.18,
         max_bins: int = 16,
         l2_reg: float = 5.0,
         subsample: float = 0.85,
@@ -45,7 +59,7 @@ class SoftTargetHistGBDT:
         self.colsample = colsample
         self.seed = seed
         self.bin_edges_: list[np.ndarray] = []
-        self.trees_: list[Tuple[int, int, int, np.ndarray]] = []
+        self.trees_: list[Tuple[list[Tuple[int, int]], np.ndarray]] = []
         self.base_logit_: float = 0.0
 
     def _fit_bins(self, X: np.ndarray) -> np.ndarray:
@@ -104,8 +118,7 @@ class SoftTargetHistGBDT:
             else:
                 g_sub, h_sub = g, h
 
-            # Sample candidate feature subset first, then compute vectorized histogram gains
-            n_cand = max(3, min(14, int(np.ceil(self.colsample * d))))
+            n_cand = max(1, min(14, min(d, int(np.ceil(self.colsample * d)))))
             cand_idx = rng.choice(d, size=n_cand, replace=False)
             X_cand = X_binned[:, cand_idx]
             flat_idx = (X_cand + (np.arange(n_cand, dtype=np.int32) * B)[None, :]).ravel()
@@ -130,16 +143,15 @@ class SoftTargetHistGBDT:
             f2 = int(cand_idx[top_3_pos[1 % len(top_3_pos)]])
             f3 = int(cand_idx[top_3_pos[2 % len(top_3_pos)]])
 
-            # Find best threshold for each of f1, f2, f3 sequentially (oblivious depth-3 tree = 8 leaves)
             splits = []
             for f_idx in (f1, f2, f3):
                 G_bin = np.bincount(X_binned[:, f_idx], weights=g_sub, minlength=B)
                 H_bin = np.bincount(X_binned[:, f_idx], weights=h_sub, minlength=B)
-                G_left = np.cumsum(G_bin)[:-1]
-                H_left = np.cumsum(H_bin)[:-1]
-                G_right = G_bin.sum() - G_left
-                H_right = H_bin.sum() - H_left
-                gains = (G_left ** 2) / (H_left + self.l2_reg) + (G_right ** 2) / (H_right + self.l2_reg)
+                G_l = np.cumsum(G_bin)[:-1]
+                H_l = np.cumsum(H_bin)[:-1]
+                G_r = G_bin.sum() - G_l
+                H_r = H_bin.sum() - H_l
+                gains = (G_l ** 2) / (H_l + self.l2_reg) + (G_r ** 2) / (H_r + self.l2_reg)
                 best_b = int(np.argmax(gains)) if len(gains) > 0 else 0
                 splits.append((f_idx, best_b))
 
@@ -170,21 +182,14 @@ class SoftTargetHistGBDT:
 
 
 class CausalGraphNeuralNetwork:
-    """2-Layer Causal Graph Neural Network (GraphSAGE / CARE-GNN / GTAN architecture)
-    trained with Adam optimizer and Expected Cross-Entropy loss under V0/V1/V2/V3.
-
-    Architecture:
-      h_i^(1) = ReLU( X_self_i W_self^(1) + Msg_1hop_i W_neigh^(1) + Rel_Summary_i W_rel^(1) + b^(1) )
-      If domain_care_filter=True (B4): applies a learned gating unit over similarity-filtered neighbor messages:
-        gate_i = sigmoid( [X_self_i || SimMsg_i] W_gate + b_gate )
-        h_i^(1) = ReLU( X_self_i W_self^(1) + (gate_i * SimMsg_i) W_neigh^(1) + Rel_Summary_i W_rel^(1) + b^(1) )
-      p_i = sigmoid( h_i^(1) W^(2) + X_self_i w_skip + b^(2) )
+    """Custom Causal Relational Neural Network over Precomputed Neighborhood Representations
+    (Audit Issue 3 Route B Reconciled Architecture).
     """
     def __init__(
         self,
-        hidden_dim: int = 20,
-        lr: float = 0.025,
-        epochs: int = 30,
+        hidden_dim: int = 16,
+        lr: float = 0.04,
+        epochs: int = 20,
         weight_decay: float = 1e-4,
         domain_care_filter: bool = False,
         seed: int = 42,
@@ -221,18 +226,19 @@ class CausalGraphNeuralNetwork:
         sample_mask: Optional[np.ndarray] = None,
     ) -> "CausalGraphNeuralNetwork":
         rng = np.random.default_rng(self.seed)
-        F_all = self._assemble_features(X_base, rel_feats, msg_1hop, sim_filtered_msg)
         if sample_mask is not None:
-            F_tr = F_all[sample_mask]
+            F_tr = self._assemble_features(
+                X_base[sample_mask], rel_feats[sample_mask], msg_1hop[sample_mask], sim_filtered_msg[sample_mask]
+            )
             y_tr = np.clip(y_target[sample_mask], 0.0, 1.0)
         else:
-            F_tr = F_all
+            F_tr = self._assemble_features(X_base, rel_feats, msg_1hop, sim_filtered_msg)
             y_tr = np.clip(y_target, 0.0, 1.0)
 
-        # Fit normalizer strictly on training rows
         self.mu_ = np.mean(F_tr, axis=0)
         self.sd_ = np.maximum(np.std(F_tr, axis=0), 1e-6)
-        Z = np.clip((F_tr - self.mu_) / self.sd_, -8.0, 8.0)
+        Z = np.ascontiguousarray(np.clip((F_tr - self.mu_) / self.sd_, -8.0, 8.0))
+        Z_T = np.ascontiguousarray(Z.T)
 
         n, d_in = Z.shape
         h_dim = self.hidden_dim
@@ -256,6 +262,7 @@ class CausalGraphNeuralNetwork:
         m_adam = {k: np.zeros_like(v) for k, v in params.items()}
         v_adam = {k: np.zeros_like(v) for k, v in params.items()}
         beta1, beta2, eps = 0.9, 0.999, 1e-8
+        inv_n = 1.0 / float(n)
 
         for epoch in range(1, self.epochs + 1):
             pre_h = Z @ params["W1"] + params["b1"]
@@ -265,34 +272,35 @@ class CausalGraphNeuralNetwork:
                 gate = _sigmoid(gate_pre)
                 h = relu_h * gate
             else:
-                gate = np.ones_like(relu_h)
+                gate = 1.0
                 h = relu_h
 
             logits = h @ params["W2"] + Z @ params["w_skip"] + params["b2"][0]
             p = _sigmoid(logits)
 
-            # Gradient of expected cross-entropy L = -1/N sum [y log p + (1-y) log(1-p)] w.r.t. logits is (p - y) / N
-            d_logits = (p - y_tr) / float(n)
+            d_logits = (p - y_tr) * inv_n
             dW2 = h.T @ d_logits + self.weight_decay * params["W2"]
-            dw_skip = Z.T @ d_logits + self.weight_decay * params["w_skip"]
-            db2 = np.array([np.sum(d_logits)], dtype=np.float64)
+            dw_skip = Z_T @ d_logits + self.weight_decay * params["w_skip"]
+            db2 = np.array([float(np.sum(d_logits))], dtype=np.float64)
 
             dh = d_logits[:, None] * params["W2"][None, :]
             d_pre_h = dh * gate * (pre_h > 0.0)
-            dW1 = Z.T @ d_pre_h + self.weight_decay * params["W1"]
+            dW1 = Z_T @ d_pre_h + self.weight_decay * params["W1"]
             db1 = np.sum(d_pre_h, axis=0)
 
             grads = {"W1": dW1, "b1": db1, "W2": dW2, "w_skip": dw_skip, "b2": db2}
             if self.domain_care_filter:
                 d_gate = dh * relu_h * gate * (1.0 - gate)
-                grads["W_gate"] = Z.T @ d_gate + self.weight_decay * params["W_gate"]
+                grads["W_gate"] = Z_T @ d_gate + self.weight_decay * params["W_gate"]
                 grads["b_gate"] = np.sum(d_gate, axis=0)
 
+            b1_corr = 1.0 / (1.0 - beta1 ** epoch)
+            b2_corr = 1.0 / (1.0 - beta2 ** epoch)
             for k, g_val in grads.items():
                 m_adam[k] = beta1 * m_adam[k] + (1.0 - beta1) * g_val
-                v_adam[k] = beta2 * v_adam[k] + (1.0 - beta2) * (g_val ** 2)
-                m_hat = m_adam[k] / (1.0 - beta1 ** epoch)
-                v_hat = v_adam[k] / (1.0 - beta2 ** epoch)
+                v_adam[k] = beta2 * v_adam[k] + (1.0 - beta2) * (g_val * g_val)
+                m_hat = m_adam[k] * b1_corr
+                v_hat = v_adam[k] * b2_corr
                 params[k] -= self.lr * m_hat / (np.sqrt(v_hat) + eps)
 
         self.params_ = params
@@ -316,3 +324,6 @@ class CausalGraphNeuralNetwork:
             h = relu_h
         logits = h @ self.params_["W2"] + Z @ self.params_["w_skip"] + self.params_["b2"][0]
         return np.clip(_sigmoid(logits), 1e-7, 1.0 - 1e-7)
+
+
+CustomCausalAggregateMLP = CausalGraphNeuralNetwork

@@ -1,57 +1,127 @@
-"""Data Acquisition, Schema Verification, and Step 1 Audit Pipeline (Section 7).
+"""Data Acquisition, Schema Verification, and Step 1 Audit Pipeline (Section 7 & Audit Issue 9).
 
 Provides:
   1. `audit_transaction_dataset(df, dataset_name)`: Computes the full Step 1 audit
      deliverables (time units & span, label prevalence by bin, identity coverage,
      entity cardinality & degree quantiles, hub concentration share, and integrity assertions).
-  2. `load_and_join_ieee_cis(train_tx_path, train_id_path)`: Joins IEEE-CIS
-     `train_transaction.csv` and `train_identity.csv` on `TransactionID` with
-     strict key uniqueness and row-preservation assertions.
+  2. `load_and_join_ieee_cis(train_tx_path, train_id_path, allow_transaction_only=False)`:
+     Joins official IEEE-CIS `train_transaction.csv` and `train_identity.csv` on `TransactionID`
+     with fail-closed file checks, duplicate-key rejection, 1:1 left-join cardinality verification,
+     and SHA-256 file provenance logging.
 """
 from __future__ import annotations
 import os
-import json
+import hashlib
+import warnings
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 
-def load_and_join_ieee_cis(train_tx_path: str, train_id_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Loads and merges official IEEE-CIS train_transaction and train_identity CSVs."""
-    if not os.path.isfile(train_tx_path):
+def _compute_file_sha256(filepath: str) -> str:
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def load_and_join_ieee_cis(
+    train_tx_path: str,
+    train_id_path: Optional[str] = None,
+    allow_transaction_only: bool = False,
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """Loads and merges official IEEE-CIS train_transaction and train_identity CSVs.
+
+    By default (`allow_transaction_only=False`), BOTH `train_transaction.csv` and
+    `train_identity.csv` are strictly required; missing either file raises `FileNotFoundError`.
+    If `allow_transaction_only=True` is explicitly passed and `train_id_path` is missing,
+    emits a visible `UserWarning` and tags `dataset_identity` as `"IEEE_CIS_TRANSACTION_ONLY_ABLATION"`.
+    """
+    if not train_tx_path or not os.path.isfile(train_tx_path):
         raise FileNotFoundError(
             f"IEEE-CIS train_transaction file not found at '{train_tx_path}'. "
             "Per Kaggle Competition Rules, download train_transaction.csv and train_identity.csv "
-            "from https://www.kaggle.com/c/ieee-fraud-detection/data and supply their path."
+            "from https://www.kaggle.com/c/ieee-fraud-detection/data and supply their paths."
         )
+
+    has_id_file = bool(train_id_path and os.path.isfile(train_id_path))
+    if not has_id_file and not allow_transaction_only:
+        raise FileNotFoundError(
+            f"IEEE-CIS train_identity file not found at '{train_id_path}'. "
+            "Both train_transaction.csv and train_identity.csv are required for the full joined benchmark. "
+            "To run an explicit transaction-only ablation, pass allow_transaction_only=True."
+        )
+
+    tx_sha256 = _compute_file_sha256(train_tx_path)
     tx = pd.read_csv(train_tx_path)
     n_tx_before = len(tx)
-    assert "TransactionID" in tx.columns and "TransactionDT" in tx.columns and "isFraud" in tx.columns
-    assert tx["TransactionID"].is_unique, "Duplicate TransactionID detected in train_transaction!"
 
-    if os.path.isfile(train_id_path):
+    required_tx_cols = {"TransactionID", "TransactionDT", "isFraud", "TransactionAmt"}
+    missing_tx_cols = required_tx_cols - set(tx.columns)
+    if missing_tx_cols:
+        raise ValueError(f"Missing required columns in train_transaction: {sorted(missing_tx_cols)}")
+
+    if not tx["TransactionID"].is_unique:
+        n_dups = int(tx["TransactionID"].duplicated().sum())
+        raise ValueError(f"Duplicate TransactionID keys ({n_dups} duplicates) detected in train_transaction!")
+
+    if not tx["isFraud"].isin([0, 1]).all():
+        raise ValueError("Invalid target values in train_transaction['isFraud']; expected binary {0, 1}.")
+
+    if has_id_file:
+        assert train_id_path is not None
+        id_sha256 = _compute_file_sha256(train_id_path)
         ident = pd.read_csv(train_id_path)
-        assert ident["TransactionID"].is_unique, "Duplicate TransactionID detected in train_identity!"
-        ident["has_identity"] = 1
-        merged = tx.merge(ident, on="TransactionID", how="left")
+        if "TransactionID" not in ident.columns:
+            raise ValueError("Missing required column 'TransactionID' in train_identity!")
+        if not ident["TransactionID"].is_unique:
+            n_id_dups = int(ident["TransactionID"].duplicated().sum())
+            raise ValueError(f"Duplicate TransactionID keys ({n_id_dups} duplicates) detected in train_identity!")
+
+        ident = ident.copy()
+        ident["has_identity"] = np.int8(1)
+        merged = tx.merge(ident, on="TransactionID", how="left", validate="one_to_one")
         merged["has_identity"] = merged["has_identity"].fillna(0).astype(np.int8)
         n_id_rows = len(ident)
-        unmatched_id = int(len(set(ident["TransactionID"]) - set(tx["TransactionID"])))
+        matched_id = int(merged["has_identity"].sum())
+        unmatched_id = int(n_id_rows - matched_id)
+        dataset_identity = "IEEE_CIS_FULL_JOINED_BENCHMARK"
     else:
+        warnings.warn(
+            "Running in explicit transaction-only ablation mode without train_identity.csv! "
+            "Output must NOT be reported as the full joined IEEE-CIS benchmark.",
+            UserWarning,
+            stacklevel=2,
+        )
+        id_sha256 = None
         merged = tx.copy()
-        merged["has_identity"] = 0
+        merged["has_identity"] = np.int8(0)
         n_id_rows = 0
+        matched_id = 0
         unmatched_id = 0
+        dataset_identity = "IEEE_CIS_TRANSACTION_ONLY_ABLATION"
 
-    assert len(merged) == n_tx_before, "Row count changed after left join on TransactionID!"
+    if len(merged) != n_tx_before:
+        raise RuntimeError(f"Row count changed after left join on TransactionID ({n_tx_before} -> {len(merged)})!")
+
     # Sort chronologically by TransactionDT, breaking ties deterministically by TransactionID
     merged = merged.sort_values(["TransactionDT", "TransactionID"], kind="mergesort").reset_index(drop=True)
     join_report = {
+        "dataset_identity": dataset_identity,
+        "allow_transaction_only": bool(allow_transaction_only),
+        "train_transaction_path": os.path.abspath(train_tx_path),
+        "train_transaction_sha256": tx_sha256,
+        "train_identity_path": os.path.abspath(train_id_path) if has_id_file and train_id_path else None,
+        "train_identity_sha256": id_sha256,
         "train_transaction_rows": int(n_tx_before),
         "train_identity_rows": int(n_id_rows),
         "merged_rows": int(len(merged)),
+        "matched_identity_rows": int(matched_id),
         "unmatched_identity_rows": int(unmatched_id),
-        "identity_join_coverage": float(merged["has_identity"].mean()),
+        "identity_join_coverage": round(float(merged["has_identity"].mean()), 6),
+        "total_columns": int(len(merged.columns)),
+        "join_cardinality_verified": "one_to_one",
     }
     return merged, join_report
 
@@ -106,7 +176,6 @@ def run_step1_data_audit(
     dt_span_sec = dt_max - dt_min
     dt_span_days_equiv = dt_span_sec / 86400.0
 
-    # Bin statistics over time
     bin_edges = np.linspace(dt_min, dt_max + 1.0, n_bins + 1)
     bin_idx = np.clip(np.digitize(dt, bin_edges) - 1, 0, n_bins - 1)
     bin_records = []

@@ -1,10 +1,23 @@
 {
-  "manifest_id": "rolling_8blocks_10d_v1",
-  "warmup_days": 54.0,
+  "manifest_id": "rolling_8blocks_10d_v1_reconciled",
+  "stream_coordinate_start_day": 1.0,
+  "stream_coordinate_end_day": 181.0,
+  "total_elapsed_span_days": 180.0,
   "initial_train_cutoff_day": 87.0,
+  "initial_train_elapsed_days": 86.0,
+  "mature_prefix_days_at_initial_cutoff_M30": 56.0,
+  "mature_prefix_interval_at_M30": "[1.0, 57.0]",
+  "immature_window_interval_at_M30": "(57.0, 87.0]",
+  "warmup_usage_rule": "All historical transactions in [1.0, train_cutoff_day] enter causal graph construction and model fitting according to supervision rule V0/V1/V2; under D2 (M=30d), [1.0, train_cutoff_day - 30.0] forms the confirmed mature prefix and (train_cutoff_day - 30.0, train_cutoff_day] forms the immature window.",
+  "train_interval_semantics": "[1.0, train_cutoff_day] (closed interval)",
+  "val_interval_semantics": "(val_start_day, val_end_day] (left-open, right-closed, 14.0 days)",
+  "test_interval_semantics": "(test_start_day, test_end_day] (left-open, right-closed, 10.0 days, strictly disjoint across blocks 0..7)",
+  "retraining_cadence_days": 10.0,
   "val_window_days": 14.0,
   "test_block_days": 10.0,
   "n_test_blocks": 8,
+  "total_test_transactions": 5358,
+  "total_test_positives": 73,
   "blocks": [
     {
       "block_id": 0,
@@ -17,7 +30,10 @@
       "n_val": 951,
       "n_test": 676,
       "n_test_pos": 7,
-      "test_prevalence": 0.01036
+      "test_prevalence": 0.01036,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 34
     },
     {
       "block_id": 1,
@@ -30,7 +46,10 @@
       "n_val": 939,
       "n_test": 676,
       "n_test_pos": 7,
-      "test_prevalence": 0.01036
+      "test_prevalence": 0.01036,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 34
     },
     {
       "block_id": 2,
@@ -43,7 +62,10 @@
       "n_val": 945,
       "n_test": 666,
       "n_test_pos": 13,
-      "test_prevalence": 0.01952
+      "test_prevalence": 0.01952,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 34
     },
     {
       "block_id": 3,
@@ -56,7 +78,10 @@
       "n_val": 949,
       "n_test": 684,
       "n_test_pos": 14,
-      "test_prevalence": 0.02047
+      "test_prevalence": 0.02047,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 35
     },
     {
       "block_id": 4,
@@ -69,7 +94,10 @@
       "n_val": 951,
       "n_test": 673,
       "n_test_pos": 10,
-      "test_prevalence": 0.01486
+      "test_prevalence": 0.01486,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 34
     },
     {
       "block_id": 5,
@@ -82,7 +110,10 @@
       "n_val": 960,
       "n_test": 646,
       "n_test_pos": 5,
-      "test_prevalence": 0.00774
+      "test_prevalence": 0.00774,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 33
     },
     {
       "block_id": 6,
@@ -95,7 +126,10 @@
       "n_val": 903,
       "n_test": 644,
       "n_test_pos": 5,
-      "test_prevalence": 0.00776
+      "test_prevalence": 0.00776,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 33
     },
     {
       "block_id": 7,
@@ -108,7 +142,10 @@
       "n_val": 904,
       "n_test": 693,
       "n_test_pos": 12,
-      "test_prevalence": 0.01732
+      "test_prevalence": 0.01732,
+      "alert_budget_k_0.5pct": 4,
+      "alert_budget_k_1.0pct": 7,
+      "alert_budget_k_5.0pct": 35
     }
   ]
 }

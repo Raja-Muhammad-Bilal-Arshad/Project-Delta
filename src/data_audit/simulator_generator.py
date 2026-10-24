@@ -3,23 +3,30 @@
 Implements the canonical 3-scenario customer-terminal transaction generator from
 the Fraud Detection Handbook (Le Borgne et al., 2022) and extends it with:
   - Card proxy (card1) vs. composite card proxy (card_comp) displaying realistic splits/merges
-  - Billing address proxy (addr_proxy) with regional hubs
-  - Purchaser email domain proxy (email_domain) with extreme power-law public hubs (e.g. gmail/yahoo equivalents)
-  - Device fingerprint proxy (device_proxy) with partial identity coverage (~26% matching IEEE-CIS)
+  - Billing address proxy (addr1) with regional hubs
+  - Purchaser email domain proxy (P_emaildomain) with extreme power-law public hubs
+  - Device fingerprint proxy (DeviceInfo) with partial identity coverage (~26.5% matching IEEE-CIS)
   - Coordinated fraud rings & card-compromise bursts across shared entities so graph topology
     contains genuine 1-hop and 2-hop signal that degrades under hub dilution or label delay.
+
+Authoritative study configuration (reconciled per Audit Issue 1):
+  n_transactions = 12,000, n_days = 180, n_customers = 1,200, n_terminals = 450,
+  n_addresses = 450, n_email_domains = 60, n_devices = 1,800, seed = 20261024
+  -> Produces 12,000 transactions, 208 frauds (1.7333% prevalence), 26.49% identity coverage.
 """
 from __future__ import annotations
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, Tuple
 
+SIMULATOR_GENERATOR_VERSION = "handbook_multi_entity_v2.0_reconciled_12k"
+
 
 def generate_handbook_multi_entity_dataset(
-    n_transactions: int = 36000,
+    n_transactions: int = 12000,
     n_days: int = 180,
-    n_customers: int = 3200,
-    n_terminals: int = 1200,
+    n_customers: int = 1200,
+    n_terminals: int = 450,
     n_addresses: int = 450,
     n_email_domains: int = 60,
     n_devices: int = 1800,
@@ -35,7 +42,7 @@ def generate_handbook_multi_entity_dataset(
     cust_prob = cust_freq / np.sum(cust_freq)
 
     # Assign primary entities to customers
-    # card1 has slight collisions (false merges ~8% of customers share a card1 BIN/sub-range)
+    # card1 has slight collisions (false merges ~10% of customers share a card1 BIN/sub-range)
     cust_card1 = rng.integers(1000, 1000 + int(n_customers * 0.90), size=n_customers)
     cust_card2 = rng.integers(100, 600, size=n_customers)
     # Composite card key is higher precision
@@ -64,7 +71,7 @@ def generate_handbook_multi_entity_dataset(
     term_choice_idx = rng.integers(0, 4, size=n_transactions)
     term_ids = cust_home_terms[cust_ids, term_choice_idx]
     random_term_mask = rng.uniform(0.0, 1.0, size=n_transactions) < 0.15
-    term_ids[random_term_mask] = rng.integers(0, n_terminals, size= int(np.sum(random_term_mask)))
+    term_ids[random_term_mask] = rng.integers(0, n_terminals, size=int(np.sum(random_term_mask)))
 
     # Transaction amounts
     amounts = rng.normal(loc=cust_mean_amt[cust_ids], scale=cust_std_amt[cust_ids])
@@ -76,13 +83,12 @@ def generate_handbook_multi_entity_dataset(
     addr1 = cust_addr[cust_ids].copy()
     email_dom = cust_email[cust_ids].copy()
 
-    # Partial identity / device coverage (~25.5% overall, matching IEEE-CIS 24.42%)
+    # Partial identity / device coverage (~26.49% overall after attack overrides, matching IEEE-CIS 24.42%)
     has_identity = rng.uniform(0.0, 1.0, size=n_transactions) < 0.255
     cust_device = rng.integers(1, n_devices + 1, size=n_customers)
     device_id = np.where(has_identity, cust_device[cust_ids], -1)
 
     # Auxiliary tabular features (analogous to IEEE-CIS C, D, M, V features)
-    # Hour of day cyclic features, customer z-score, channel indicator, match flags
     hour_of_day = ((transaction_dt_sec // 3600) % 24).astype(np.float64)
     is_night = ((hour_of_day >= 1) & (hour_of_day <= 5)).astype(np.float64)
     product_cd = rng.choice([0, 1, 2, 3, 4], size=n_transactions, p=[0.74, 0.10, 0.08, 0.05, 0.03])
@@ -112,14 +118,13 @@ def generate_handbook_multi_entity_dataset(
         ip_risk_tabular[hit] += rng.normal(0.85, 0.4, size=int(np.sum(hit)))
 
     # Scenario 3: Compromised cards & coordinated fraud rings (shared device/address/card bursts)
-    # Fraudsters compromise a card or use a shared attack device/address across multiple cards over 5-12 days
     n_comp_rings = 140
     for r_idx in range(n_comp_rings):
         t_start = rng.uniform(2.0, float(n_days) - 8.0)
         t_end = t_start + rng.uniform(3.0, 10.0)
         ring_cards = rng.choice(n_customers, size=rng.integers(2, 6), replace=False)
-        shared_attack_addr = int(rng.integers(50, n_addresses))  # specific drop address
-        shared_attack_dev = int(rng.integers(1, 350))            # bot/ring device
+        shared_attack_addr = int(rng.integers(50, n_addresses))
+        shared_attack_dev = int(rng.integers(1, 350))
         ring_mask = np.isin(cust_ids, ring_cards) & (event_time_days >= t_start) & (event_time_days <= t_end)
         idxs = np.where(ring_mask)[0]
         if len(idxs) > 0:
@@ -127,7 +132,7 @@ def generate_handbook_multi_entity_dataset(
                 if rng.uniform(0.0, 1.0) < 0.72:
                     is_fraud[idx] = 1
                     fraud_scenario[idx] = 3
-                    amounts[idx] = np.round( amounts[idx] * rng.uniform(1.6, 3.8), 2)
+                    amounts[idx] = np.round(amounts[idx] * rng.uniform(1.6, 3.8), 2)
                     addr1[idx] = shared_attack_addr
                     has_identity[idx] = True
                     device_id[idx] = shared_attack_dev
@@ -165,8 +170,15 @@ def generate_handbook_multi_entity_dataset(
     })
 
     meta = {
+        "generator_version": SIMULATOR_GENERATOR_VERSION,
+        "seed": int(seed),
         "n_transactions": int(n_transactions),
         "n_days": int(n_days),
+        "n_customers": int(n_customers),
+        "n_terminals": int(n_terminals),
+        "n_addresses": int(n_addresses),
+        "n_email_domains": int(n_email_domains),
+        "n_devices": int(n_devices),
         "fraud_count": int(np.sum(is_fraud)),
         "fraud_prevalence": float(np.mean(is_fraud)),
         "identity_coverage": float(np.mean(has_identity)),
